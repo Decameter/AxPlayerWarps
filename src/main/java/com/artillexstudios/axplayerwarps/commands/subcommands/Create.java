@@ -1,14 +1,14 @@
 package com.artillexstudios.axplayerwarps.commands.subcommands;
 
-import com.artillexstudios.axapi.utils.Cooldown;
-import com.artillexstudios.axintegrations.types.CurrencyIntegration;
-import com.artillexstudios.axintegrations.types.ProtectionIntegration;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.api.events.AxPlayerWarpsCreateEvent;
 import com.artillexstudios.axplayerwarps.api.events.AxPlayerWarpsPreCreateEvent;
 import com.artillexstudios.axplayerwarps.enums.Access;
+import com.artillexstudios.axplayerwarps.hooks.HookManager;
+import com.artillexstudios.axplayerwarps.hooks.currency.CurrencyHook;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
+import com.artillexstudios.axplayerwarps.utils.Cooldown;
 import com.artillexstudios.axplayerwarps.utils.FormatUtils;
 import com.artillexstudios.axplayerwarps.utils.SimpleRegex;
 import com.artillexstudios.axplayerwarps.utils.WarpNameUtils;
@@ -27,7 +27,7 @@ import static com.artillexstudios.axplayerwarps.AxPlayerWarps.MESSAGEUTILS;
 public enum Create {
     INSTANCE;
 
-    private final Cooldown<Player> cooldown = Cooldown.create();
+    private final Cooldown<Player> cooldown = new Cooldown<>();
     public void execute(Player sender, String warpName) {
         WarpUser user = Users.get(sender);
         long limit = user.getWarpLimit();
@@ -44,7 +44,7 @@ public enum Create {
             return;
         }
 
-        if (!ProtectionIntegration.hasPermission(sender, warpLocation, ProtectionIntegration.Permission.BREAK)) {
+        if (!HookManager.canBreak(sender, warpLocation)) {
             MESSAGEUTILS.sendLang(sender, "errors.cannot-create-here");
             return;
         }
@@ -95,11 +95,11 @@ public enum Create {
         if (preCreateEvent.isCancelled()) return;
         price = preCreateEvent.getCreationPrice();
 
-        CurrencyIntegration integration;
+        CurrencyHook integration;
         CompletableFuture<Boolean> future = CompletableFuture.completedFuture(true);
         if (creationPaid & price > 0) {
             String currStr = CONFIG.getString("warp-creation-cost.currency", "Experience");
-            integration = CurrencyIntegration.one(currStr);
+            integration = HookManager.getCurrency(currStr);
             if (integration != null) {
                 // not enough balance
                 if (integration.getBalance(sender) < price) {
@@ -124,6 +124,7 @@ public enum Create {
 
         final double finalPrice = price;
         future.thenAccept(success -> {
+            if (!success) return;
             AxPlayerWarpsCreateEvent createEvent = new AxPlayerWarpsCreateEvent(sender, warp, finalPrice);
             Bukkit.getServer().getPluginManager().callEvent(createEvent);
 

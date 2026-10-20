@@ -1,7 +1,7 @@
 package com.artillexstudios.axplayerwarps.sorting;
 
-import com.artillexstudios.axapi.libs.boostedyaml.block.implementation.Section;
 import com.artillexstudios.axplayerwarps.enums.Sorting;
+import dev.dejvokep.boostedyaml.block.implementation.Section;
 
 import java.util.Iterator;
 import java.util.LinkedList;

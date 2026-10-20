@@ -1,20 +1,23 @@
 package com.artillexstudios.axplayerwarps.commands.subcommands;
 
-import com.artillexstudios.axguiframework.actions.impl.ActionMenu;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiManager;
 import com.artillexstudios.axplayerwarps.warps.Warp;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
-import revxrsal.commands.exception.CommandErrorException;
 
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.CONFIG;
+import static com.artillexstudios.axplayerwarps.AxPlayerWarps.MESSAGEUTILS;
 
 public enum Open {
     INSTANCE;
 
     public void execute(CommandSender sender, @Nullable Warp warp) {
         if (warp != null) {
-            if (!(sender instanceof Player pl)) throw new CommandErrorException("must-be-player");
+            if (!(sender instanceof Player pl)) {
+                MESSAGEUTILS.sendLang(sender, "commands.player-only");
+                return;
+            }
             warp.teleportPlayer(pl);
             return;
         }
@@ -29,10 +32,11 @@ public enum Open {
             if (sender instanceof Player pl) {
                 openTo = pl;
             } else {
-                throw new CommandErrorException("must-be-player");
+                MESSAGEUTILS.sendLang(sender, "commands.player-only");
+                return;
             }
         }
 
-        new ActionMenu().run(openTo, null, null, CONFIG.getString("default-gui", "categories"));
+        GuiManager.open(openTo, CONFIG.getString("default-gui", "categories"));
     }
 }

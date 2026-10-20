@@ -1,30 +1,29 @@
 package com.artillexstudios.axplayerwarps.guis;
 
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.loader.LoaderSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.updater.UpdaterSettings;
-import com.artillexstudios.axapi.nms.wrapper.ServerPlayerWrapper;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.AsyncUtils;
-import com.artillexstudios.axapi.utils.ItemBuilder;
-import com.artillexstudios.axguiframework.PaginatedGuiFrame;
-import com.artillexstudios.axguiframework.actions.GuiActions;
-import com.artillexstudios.axguiframework.item.AxGuiItem;
-import com.artillexstudios.axguiframework.libs.gui.guis.Gui;
-import com.artillexstudios.axguiframework.replacements.Replacements;
-import com.artillexstudios.axguiframework.utils.CooldownManager;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.category.Category;
+import com.artillexstudios.axplayerwarps.config.Config;
 import com.artillexstudios.axplayerwarps.guis.actions.BackAction;
 import com.artillexstudios.axplayerwarps.guis.actions.CategoryAction;
+import com.artillexstudios.axplayerwarps.guis.framework.AxGuiItem;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiManager;
+import com.artillexstudios.axplayerwarps.guis.framework.PaginatedGuiFrame;
+import com.artillexstudios.axplayerwarps.guis.framework.Replacements;
+import com.artillexstudios.axplayerwarps.guis.framework.actions.GuiActions;
 import com.artillexstudios.axplayerwarps.input.InputManager;
 import com.artillexstudios.axplayerwarps.sorting.WarpComparator;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
+import com.artillexstudios.axplayerwarps.utils.AsyncUtils;
+import com.artillexstudios.axplayerwarps.utils.ItemBuilder;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
 import com.artillexstudios.axplayerwarps.warps.Warp;
 import com.artillexstudios.axplayerwarps.warps.WarpManager;
+import dev.dejvokep.boostedyaml.settings.dumper.DumperSettings;
+import dev.dejvokep.boostedyaml.settings.general.GeneralSettings;
+import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
+import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
+import dev.triumphteam.gui.guis.Gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -87,10 +86,10 @@ public class WarpsGui extends PaginatedGuiFrame {
 
     public static boolean reload() {
         long cd = CONFIG.getLong("gui-refresh-cooldown-milliseconds", 50);
-        CooldownManager.setCooldownMillis(cd);
+        GuiManager.setCooldownMillis(cd);
 
-        GuiActions.register(new CategoryAction());
-        GuiActions.register(new BackAction());
+        GuiActions.register("category", new CategoryAction());
+        GuiActions.register("back", new BackAction());
 
         return GUI.reload();
     }
@@ -200,9 +199,8 @@ public class WarpsGui extends PaginatedGuiFrame {
                     if (icon == Material.PLAYER_HEAD) {
                         Player pl = Bukkit.getPlayer(warp.getOwner());
                         if (pl != null) {
-                            ServerPlayerWrapper wrapper = ServerPlayerWrapper.wrap(pl);
-                            var textures = wrapper.textures();
-                            if (textures.texture() != null) builder.setTextureValue(textures.texture());
+                            String texture = ItemBuilder.getTexture(pl);
+                            if (texture != null) builder.setTextureValue(texture);
                         }
                     }
 
@@ -227,10 +225,10 @@ public class WarpsGui extends PaginatedGuiFrame {
                     gui.addItem(axGuiItem);
                 }
 
-                Scheduler.get().run(player, task -> {
+                Scheduler.run(player, () -> {
                     updateTitle();
                     future.complete(null);
-                }, () -> {});
+                });
             });
         });
 

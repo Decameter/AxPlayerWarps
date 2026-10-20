@@ -1,22 +1,29 @@
 package com.artillexstudios.axplayerwarps.input;
 
-import com.artillexstudios.axapi.gui.AnvilInput;
-import com.artillexstudios.axapi.gui.SignInput;
-import com.artillexstudios.axapi.items.WrappedItemStack;
-import com.artillexstudios.axapi.libs.boostedyaml.block.implementation.Section;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.ItemBuilder;
-import com.artillexstudios.axapi.utils.StringUtils;
+import com.artillexstudios.axplayerwarps.utils.ItemBuilder;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
+import dev.dejvokep.boostedyaml.block.implementation.Section;
+import io.papermc.paper.math.Position;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.block.Sign;
+import org.bukkit.block.sign.Side;
+import org.bukkit.block.sign.SignSide;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.MenuType;
+import org.bukkit.inventory.view.AnvilView;
 
+import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.INPUT;
 
+/**
+ * Asks a player for text with a sign, an anvil or the chat, as set in input.yml.
+ * The consumer runs on the player's thread and gets an empty string if the player cancelled.
+ */
 public class InputManager {
 
     public static void getInput(Player player, String route, Consumer<String> consumer) {
@@ -28,57 +35,38 @@ public class InputManager {
         }
     }
 
+    // a sign that only exists for the player, placed a few blocks below them so it is not in their way
     private static void openSign(Player player, Section section, Consumer<String> consumer) {
-        new SignInput(player, StringUtils.formatList(section.getStringList("sign")).toArray(Component[]::new), (pl, result) -> {
-            try {
-                String res = result[0];
-                Scheduler.get().run(player, task -> {
-                    if (res.isBlank()) {
-                        consumer.accept("");
-                        return;
-                    }
-                    consumer.accept(res);
-                }, () -> {});
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }).open();
+        player.closeInventory();
+        Location location = player.getLocation().getBlock().getLocation();
+        location.setY(Math.max(location.getWorld().getMinHeight(), location.getBlockY() - 4));
+
+        Sign sign = (Sign) Material.OAK_SIGN.createBlockData().createBlockState();
+        SignSide side = sign.getSide(Side.FRONT);
+        List<String> lines = section.getStringList("sign");
+        for (int i = 0; i < Math.min(4, lines.size()); i++) {
+            side.line(i, StringUtils.format(lines.get(i)));
+        }
+
+        player.sendBlockChange(location, sign.getBlockData());
+        player.sendBlockUpdate(location, sign);
+        InputListener.getSignInputs().put(player.getUniqueId(), new InputListener.SignInput(Position.block(location), location, consumer));
+        player.openVirtualSign(Position.block(location), Side.FRONT);
     }
 
     private static void openAnvil(Player player, Section section, Consumer<String> consumer) {
-        AtomicBoolean ended = new AtomicBoolean(false);
-        new AnvilInput(
-                player,
-                WrappedItemStack.wrap(ItemBuilder.create(section.getSection("anvil.item")).get()),
-                StringUtils.format(section.getString("anvil.title")),
-                clickEvent -> {
-                    clickEvent.setCancelled(true);
-                    if (ended.get()) return;
-                    if (clickEvent.getSlot() != 2) return;
-                    ItemStack item = clickEvent.getInventory().getItem(2);
-                    if (item == null) return;
-                    ended.set(true);
-                    String res = item.getItemMeta().getDisplayName();
-                    clickEvent.getInventory().clear();
-                    clickEvent.getWhoClicked().closeInventory();
-                    Scheduler.get().run(player, task -> {
-                        consumer.accept(res);
-                    }, () -> {});
-                },
-                closeEvent -> {
-                    closeEvent.getInventory().clear();
-                    if (ended.get()) return;
-                    closeEvent.getPlayer().closeInventory();
-                    Scheduler.get().run(player, task -> {
-                        consumer.accept("");
-                    }, () -> {});
-                }
-        ).open();
+        Component title = StringUtils.format(section.getString("anvil.title", ""));
+        AnvilView view = MenuType.ANVIL.create(player, title);
+        view.getTopInventory().setItem(0, ItemBuilder.create(section.getSection("anvil.item")).get());
+        InputListener.getAnvilInputs().put(player.getUniqueId(), new InputListener.AnvilInput(view, consumer));
+        view.open();
     }
 
     private static void openChat(Player player, Section section, Consumer<String> consumer) {
         player.closeInventory();
-        player.sendMessage(String.join("\n", StringUtils.formatListToString(section.getStringList("chat"))));
-        InputListener.getInputPlayers().put(player, consumer);
+        for (String line : section.getStringList("chat")) {
+            player.sendMessage(StringUtils.format(line));
+        }
+        InputListener.getChatInputs().put(player.getUniqueId(), consumer);
     }
 }

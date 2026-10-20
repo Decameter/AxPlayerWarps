@@ -1,10 +1,5 @@
 package com.artillexstudios.axplayerwarps.warps;
 
-import com.artillexstudios.axapi.placeholders.PlaceholderHandler;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.Cooldown;
-import com.artillexstudios.axapi.utils.PaperUtils;
-import com.artillexstudios.axintegrations.types.CurrencyIntegration;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.api.events.AxPlayerWarpsDeleteEvent;
 import com.artillexstudios.axplayerwarps.api.events.AxPlayerWarpsPreTeleportEvent;
@@ -14,8 +9,12 @@ import com.artillexstudios.axplayerwarps.database.impl.Base;
 import com.artillexstudios.axplayerwarps.enums.Access;
 import com.artillexstudios.axplayerwarps.enums.AccessList;
 import com.artillexstudios.axplayerwarps.hooks.HookManager;
+import com.artillexstudios.axplayerwarps.hooks.currency.CurrencyHook;
+import com.artillexstudios.axplayerwarps.placeholders.PlaceholderHandler;
 import com.artillexstudios.axplayerwarps.placeholders.WarpPlaceholders;
+import com.artillexstudios.axplayerwarps.utils.Cooldown;
 import com.artillexstudios.axplayerwarps.utils.FormatUtils;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -175,18 +174,18 @@ public class Warp {
     }
 
     @Nullable
-    public CurrencyIntegration getCurrencyIntegration() {
-        return CurrencyIntegration.one(currency);
+    public CurrencyHook getCurrencyHook() {
+        return HookManager.getCurrency(currency);
     }
 
     @Nullable
     public HookManager.CurrencyOptions getCurrencyOptions() {
-        CurrencyIntegration integration = getCurrencyIntegration();
+        CurrencyHook integration = getCurrencyHook();
         if (integration == null) return null;
         return HookManager.getCurrencyOptions(integration);
     }
 
-    public void setCurrency(@Nullable CurrencyIntegration currency) {
+    public void setCurrency(@Nullable CurrencyHook currency) {
         this.currency = currency == null ? null : currency.getFormattedName();
     }
 
@@ -290,7 +289,7 @@ public class Warp {
             return CompletableFuture.completedFuture(false);
         }
 
-        return PaperUtils.getChunkAtAsync(location).thenApply((chunk) -> {
+        return location.getWorld().getChunkAtAsync(location).thenApply((chunk) -> {
             int x = location.getBlockX() & 15;
             int y = location.getBlockY();
             int z = location.getBlockZ() & 15;
@@ -311,8 +310,8 @@ public class Warp {
         });
     }
 
-    private final Cooldown<Player> confirmUnsafe = Cooldown.create();
-    private final Cooldown<Player> confirmPaid = Cooldown.create();
+    private final Cooldown<Player> confirmUnsafe = new Cooldown<>();
+    private final Cooldown<Player> confirmPaid = new Cooldown<>();
     public void teleportPlayer(Player player) {
         validateTeleport(player, false, bool -> {
             if (!bool) return;
@@ -320,9 +319,9 @@ public class Warp {
                 completeTeleportPlayer(player);
                 return;
             }
-            Scheduler.get().run(player, task -> {
+            Scheduler.run(player, () -> {
                 player.closeInventory();
-            }, () -> {});
+            });
             WarpQueue.addToQueue(player, this);
         });
     }
@@ -385,7 +384,7 @@ public class Warp {
             }
 
             // check balance
-            if (!isOwner && isPaid() && getCurrencyIntegration().getBalance(player) < teleportPrice) {
+            if (!isOwner && isPaid() && getCurrencyHook().getBalance(player) < teleportPrice) {
                 MESSAGEUTILS.sendLang(player, "errors.not-enough-balance");
                 response.accept(false);
                 return;
@@ -406,12 +405,10 @@ public class Warp {
             if (preTeleportEvent.isCancelled()) return;
             double newTeleportPrice = preTeleportEvent.getTeleportPrice();
 
-            Scheduler.get().execute(player, () -> {
-                player.closeInventory();
-            }, () -> {}, 0);
+            Scheduler.run(player, player::closeInventory);
             CompletableFuture<Boolean> future = CompletableFuture.completedFuture(true);
             if (needsToPay && newTeleportPrice > 0) {
-                future = getCurrencyIntegration().takeBalance(player.getUniqueId(), newTeleportPrice);
+                future = getCurrencyHook().takeBalance(player.getUniqueId(), newTeleportPrice);
                 future.thenAccept(success -> {
                     if (!success) return;
 
@@ -428,16 +425,17 @@ public class Warp {
             future.thenAccept(success -> {
                 if (!success) return;
 
-                Scheduler.get().run(player, task -> {
+                Scheduler.run(player, () -> {
                     // send message
                     MESSAGEUTILS.sendLang(player, "teleport.success", Map.of("%warp%", getName()));
                     confirmUnsafe.remove(player);
                     confirmPaid.remove(player);
 
-                    PaperUtils.teleportAsync(player, location);
+                    player.teleportAsync(location);
 
                     for (String m : CONFIG.getStringList("teleport-commands")) {
-                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), PlaceholderHandler.parse(m.replace("%player%", player.getName()), this, player));
+                        String command = PlaceholderHandler.parse(m.replace("%player%", player.getName()), this, player);
+                        Scheduler.run(() -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
                     }
 
                     AxPlayerWarpsTeleportEvent teleportEvent = new AxPlayerWarpsTeleportEvent(player, this, needsToPay ? teleportPrice : 0);
@@ -446,7 +444,7 @@ public class Warp {
                     AxPlayerWarps.getThreadedQueue().submit(() -> {
                         AxPlayerWarps.getDatabase().addVisit(player, this);
                     });
-                }, () -> {});
+                });
             });
         });
     }
@@ -466,7 +464,7 @@ public class Warp {
 
     public void withdrawMoney() {
         Player player = Bukkit.getPlayer(owner);
-        CurrencyIntegration integration = getCurrencyIntegration();
+        CurrencyHook integration = getCurrencyHook();
         if (earnedMoney <= 0 || currency == null || integration == null) {
             MESSAGEUTILS.sendLang(player, "errors.nothing-withdrawable");
             return;

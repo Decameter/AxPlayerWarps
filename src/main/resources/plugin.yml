@@ -1,8 +1,15 @@
 name: AxPlayerWarps
 version: '${project.version}'
 main: com.artillexstudios.axplayerwarps.AxPlayerWarps
-api-version: '1.20'
+api-version: '1.21.8'
 folia-supported: true
+
+# downloaded by the server on startup
+libraries:
+  - com.zaxxer:HikariCP:7.1.0
+  - com.mysql:mysql-connector-j:9.7.0
+  - org.postgresql:postgresql:42.7.5
+  - com.h2database:h2:2.1.214
 
 permissions:
   axplayerwarps.open:
@@ -38,31 +45,15 @@ permissions:
 
 softdepend:
   - PlaceholderAPI
-  - BentoBox
+  - Vault
+  - PlayerPoints
+  - TokenManager
+  - WorldGuard
   - GriefPrevention
+  - Lands
+  - Towny
+  - PlotSquared
   - HuskClaims
   - HuskTowns
-  - IridiumSkyBlock
-  - Kingdoms
-  - Lands
-  - LockettePro
-  - PlotSquared
-  - Residence
-  - SaberFactions
   - SuperiorSkyblock2
-  - Towny
-  - WorldGuard
-  - AxQuestBoard
-  - BeastTokens
-  - CoinsEngine
-  - ExcellentEconomy
-  - EcoBits
-  - Kingdoms
-  - PlayerPoints
-  - RivalHarvesterHoes
-  - RoyaleEconomy
-  - SuperMobCoins
-  - TheOnly-MobCoins
-  - TokenManager
-  - UltraEconomy
-  - Vault
+  - BentoBox

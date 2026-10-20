@@ -1,7 +1,7 @@
 package com.artillexstudios.axplayerwarps.commands.subcommands;
 
-import com.artillexstudios.axapi.placeholders.PlaceholderHandler;
-import com.artillexstudios.axapi.utils.StringUtils;
+import com.artillexstudios.axplayerwarps.placeholders.PlaceholderHandler;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.warps.Warp;
 import org.bukkit.command.CommandSender;
 
@@ -30,7 +30,7 @@ public enum Info {
         }
 
         for (String s : lore) {
-            sender.sendMessage(StringUtils.formatToString(PlaceholderHandler.parse(s, warp)));
+            sender.sendMessage(StringUtils.format(PlaceholderHandler.parse(s, warp)));
         }
     }
 }

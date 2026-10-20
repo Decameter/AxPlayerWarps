@@ -1,24 +1,8 @@
 package com.artillexstudios.axplayerwarps;
 
-import com.artillexstudios.axapi.AxPlugin;
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.dependencies.DependencyManagerWrapper;
-import com.artillexstudios.axapi.executor.ThreadedQueue;
-import com.artillexstudios.axapi.libs.boostedyaml.dvs.versioning.BasicVersioning;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.loader.LoaderSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.updater.UpdaterSettings;
-import com.artillexstudios.axapi.metrics.AxMetrics;
-import com.artillexstudios.axapi.utils.AsyncUtils;
-import com.artillexstudios.axapi.utils.MessageUtils;
-import com.artillexstudios.axapi.utils.StringUtils;
-import com.artillexstudios.axapi.utils.featureflags.FeatureFlags;
-import com.artillexstudios.axapi.utils.logging.LoggerNameFormat;
-import com.artillexstudios.axguiframework.GuiManager;
-import com.artillexstudios.axguiframework.GuiUpdater;
 import com.artillexstudios.axplayerwarps.category.CategoryManager;
 import com.artillexstudios.axplayerwarps.commands.CommandManager;
+import com.artillexstudios.axplayerwarps.config.Config;
 import com.artillexstudios.axplayerwarps.database.Database;
 import com.artillexstudios.axplayerwarps.database.impl.H2;
 import com.artillexstudios.axplayerwarps.database.impl.MySQL;
@@ -32,26 +16,38 @@ import com.artillexstudios.axplayerwarps.guis.RateWarpGui;
 import com.artillexstudios.axplayerwarps.guis.RecentsGui;
 import com.artillexstudios.axplayerwarps.guis.WarpsGui;
 import com.artillexstudios.axplayerwarps.guis.WhitelistGui;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiManager;
 import com.artillexstudios.axplayerwarps.hooks.HookManager;
 import com.artillexstudios.axplayerwarps.input.InputListener;
-import com.artillexstudios.axplayerwarps.libraries.Libraries;
 import com.artillexstudios.axplayerwarps.listeners.MoveListener;
 import com.artillexstudios.axplayerwarps.listeners.PlayerListeners;
 import com.artillexstudios.axplayerwarps.listeners.WorldListeners;
+import com.artillexstudios.axplayerwarps.placeholders.PlaceholderExpansion;
 import com.artillexstudios.axplayerwarps.placeholders.WarpPlaceholders;
 import com.artillexstudios.axplayerwarps.sorting.SortingManager;
+import com.artillexstudios.axplayerwarps.utils.AsyncUtils;
+import com.artillexstudios.axplayerwarps.utils.DataQueue;
+import com.artillexstudios.axplayerwarps.utils.MessageUtils;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.utils.UpdateNotifier;
 import com.artillexstudios.axplayerwarps.warps.WarpManager;
 import com.artillexstudios.axplayerwarps.warps.WarpQueue;
 import com.artillexstudios.axplayerwarps.world.WorldManager;
+import dev.dejvokep.boostedyaml.dvs.versioning.BasicVersioning;
+import dev.dejvokep.boostedyaml.settings.dumper.DumperSettings;
+import dev.dejvokep.boostedyaml.settings.general.GeneralSettings;
+import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
+import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 
-public final class AxPlayerWarps extends AxPlugin {
-    private static AxPlugin instance;
-    private static ThreadedQueue<Runnable> threadedQueue;
+public final class AxPlayerWarps extends JavaPlugin {
+    private static AxPlayerWarps instance;
+    private static DataQueue threadedQueue;
     private static Database database;
     public static MessageUtils MESSAGEUTILS;
     public static Config CONFIG;
@@ -59,9 +55,8 @@ public final class AxPlayerWarps extends AxPlugin {
     public static Config LANG;
     public static Config CURRENCIES;
     public static Config INPUT;
-    private static AxMetrics metrics;
 
-    public static ThreadedQueue<Runnable> getThreadedQueue() {
+    public static DataQueue getThreadedQueue() {
         return threadedQueue;
     }
 
@@ -69,22 +64,17 @@ public final class AxPlayerWarps extends AxPlugin {
         return database;
     }
 
-    public static AxPlugin getInstance() {
+    public static AxPlayerWarps getInstance() {
         return instance;
-    }
-
-    @Override
-    public void dependencies(DependencyManagerWrapper manager) {
-        instance = this;
-        Libraries.load(this, manager);
     }
 
     // todo future plans
     // - desc color codes
     // - teleport price tax
-    public void enable() {
-        new Metrics(this, 21645);
+    @Override
+    public void onEnable() {
         instance = this;
+        new Metrics(this, 21645);
 
         CONFIG = new Config(new File(getDataFolder(), "config.yml"), getResource("config.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setVersioning(new BasicVersioning("version")).build());
         HOOKS = new Config(new File(getDataFolder(), "hooks.yml"), getResource("hooks.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setVersioning(new BasicVersioning("version")).build());
@@ -92,29 +82,32 @@ public final class AxPlayerWarps extends AxPlugin {
         CURRENCIES = new Config(new File(getDataFolder(), "currencies.yml"), getResource("currencies.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setKeepAll(true).setVersioning(new BasicVersioning("version")).build());
         INPUT = new Config(new File(getDataFolder(), "input.yml"), getResource("input.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setKeepAll(true).setVersioning(new BasicVersioning("version")).build());
 
-        threadedQueue = new ThreadedQueue<>("AxPlayerWarps-Datastore-thread");
+        threadedQueue = new DataQueue("AxPlayerWarps-Datastore-thread");
+        AsyncUtils.start(CONFIG.getInt("gui-loading-threads", 2));
 
-        MESSAGEUTILS = new MessageUtils(LANG.getBackingDocument(), "prefix", CONFIG.getBackingDocument());
+        MESSAGEUTILS = new MessageUtils(LANG, "prefix", CONFIG);
 
         CategoryGui.reload();
-        GuiManager.registerGuiType("categories", CategoryGui.class);
+        GuiManager.registerGuiType("categories", CategoryGui::new);
         WarpsGui.reload();
-        GuiManager.registerGuiType("warps", WarpsGui.class);
+        GuiManager.registerGuiType("warps", WarpsGui::new);
         RateWarpGui.reload();
         EditWarpGui.reload();
         FavoritesGui.reload();
-        GuiManager.registerGuiType("favorites", FavoritesGui.class);
+        GuiManager.registerGuiType("favorites", FavoritesGui::new);
         RecentsGui.reload();
-        GuiManager.registerGuiType("recents", RecentsGui.class);
+        GuiManager.registerGuiType("recents", RecentsGui::new);
         MyWarpsGui.reload();
-        GuiManager.registerGuiType("my-warps", MyWarpsGui.class);
+        GuiManager.registerGuiType("my-warps", MyWarpsGui::new);
         WhitelistGui.reload();
         BlacklistGui.reload();
 
         WarpPlaceholders.load();
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            new PlaceholderExpansion().register();
+        }
 
         switch (CONFIG.getString("database.type").toLowerCase()) {
-//            case "sqlite" -> database = new SQLite();
             case "mysql" -> database = new MySQL();
             case "postgresql" -> database = new PostgreSQL();
             default -> database = new H2();
@@ -122,7 +115,8 @@ public final class AxPlayerWarps extends AxPlugin {
 
         database.setup();
 
-        HookManager.setupHooks();
+        // runs once the server has finished starting, after the hooked plugins are enabled
+        Scheduler.run(HookManager::setupHooks);
 
         WorldManager.reload();
         CategoryManager.reload();
@@ -138,29 +132,16 @@ public final class AxPlayerWarps extends AxPlugin {
         getServer().getPluginManager().registerEvents(new MoveListener(), this);
         getServer().getPluginManager().registerEvents(new InputListener(), this);
 
-        metrics = new AxMetrics(this, 17);
-        metrics.start();
-
-        Bukkit.getConsoleSender().sendMessage(StringUtils.formatToString("&#44f1d7[AxPlayerWarps] Loaded plugin! Using &f" + database.getType() + " &#44f1d7database to store data!"));
+        Bukkit.getConsoleSender().sendMessage(StringUtils.format("&#44f1d7[AxPlayerWarps] Loaded plugin! Using &f" + database.getType() + " &#44f1d7database to store data!"));
 
         UpdateNotifier.init(CONFIG, LANG);
         if (CONFIG.getBoolean("update-notifier.enabled", true)) new UpdateNotifier();
     }
 
-    public void disable() {
-        if (metrics != null) metrics.cancel();
-        database.disable();
-        GuiUpdater.stop();
+    @Override
+    public void onDisable() {
         AsyncUtils.stop();
-        threadedQueue.stop();
-    }
-
-    public void updateFlags() {
-        Config config = new Config(new File(getDataFolder(), "config.yml"));
-        FeatureFlags.PLACEHOLDER_API_HOOK.set(true);
-        FeatureFlags.PLACEHOLDER_API_IDENTIFIER.set("axplayerwarps");
-        FeatureFlags.ASYNC_UTILS_POOL_SIZE.set(config.getInt("gui-loading-threads", 2));
-        FeatureFlags.ENABLE_PACKET_LISTENERS.set(true);
-        FeatureFlags.LOGGER_NAME_FORMAT.set(LoggerNameFormat.NAMEABLE);
+        if (threadedQueue != null) threadedQueue.stop();
+        if (database != null) database.disable();
     }
 }

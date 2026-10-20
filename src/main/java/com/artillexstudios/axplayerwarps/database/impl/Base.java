@@ -1,6 +1,5 @@
 package com.artillexstudios.axplayerwarps.database.impl;
 
-import com.artillexstudios.axapi.utils.Pair;
 import com.artillexstudios.axplayerwarps.category.Category;
 import com.artillexstudios.axplayerwarps.category.CategoryManager;
 import com.artillexstudios.axplayerwarps.database.Database;
@@ -29,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class Base implements Database {
@@ -298,14 +298,14 @@ public class Base implements Database {
     }
 
     @Override
-    public Pair<UUID, String> getUUIDAndNameFromId(int id) {
+    public Map.Entry<UUID, String> getUUIDAndNameFromId(int id) {
         ThreadUtils.checkNotMain("This method can only be called async!");
         try (Connection conn = getConnection(); PreparedStatement stmt = createStatement(conn,
                 "SELECT uuid, name FROM axplayerwarps_players WHERE id = ?",
                 id)
         ) {
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) return new Pair<>(UUID.fromString(rs.getString(1)), rs.getString(2));
+                if (rs.next()) return Map.entry(UUID.fromString(rs.getString(1)), rs.getString(2));
             }
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -514,7 +514,7 @@ public class Base implements Database {
                 warp.getDescription(),
                 warp.getCategory() == null ? null : getCategoryId(warp.getCategory().raw()),
                 warp.getIcon() == null ? null : getMaterialId(warp.getIcon()),
-                warp.getCurrency() == null ? null : getCurrencyId(warp.getCurrencyIntegration().getName()),
+                warp.getCurrency() == null ? null : getCurrencyId(warp.getCurrency()),
                 warp.getTeleportPrice(),
                 warp.getEarnedMoney(),
                 warp.getAccess().ordinal(),
@@ -573,19 +573,19 @@ public class Base implements Database {
     }
 
     @Override
-    public Pair<Integer, Float> getRatings(Warp warp) {
+    public Map.Entry<Integer, Float> getRatings(Warp warp) {
         ThreadUtils.checkNotMain("This method can only be called async!");
         try (Connection conn = getConnection(); PreparedStatement stmt = createStatement(conn,
                 "SELECT count(reviewer_id), avg(stars) FROM axplayerwarps_ratings WHERE warp_id = ?;",
                 warp.getId())
         ) {
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) return new Pair<>(rs.getInt(1), rs.getFloat(2));
+                if (rs.next()) return Map.entry(rs.getInt(1), rs.getFloat(2));
             }
         } catch (SQLException ex) {
             ex.printStackTrace();
         }
-        return new Pair<>(0, 0f);
+        return Map.entry(0, 0f);
     }
 
     @Override
@@ -915,7 +915,7 @@ public class Base implements Database {
                         material = getMaterialFromId(rs.getInt("icon_id"));
                     }
 
-                    Pair<UUID, String> player = getUUIDAndNameFromId(rs.getInt("owner_id"));
+                    Map.Entry<UUID, String> player = getUUIDAndNameFromId(rs.getInt("owner_id"));
                     if (player == null) continue;
 
                     Warp warp = new Warp(

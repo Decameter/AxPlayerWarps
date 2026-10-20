@@ -1,23 +1,23 @@
 package com.artillexstudios.axplayerwarps.guis;
 
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.libs.boostedyaml.block.implementation.Section;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.loader.LoaderSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.updater.UpdaterSettings;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.NumberUtils;
-import com.artillexstudios.axapi.utils.StringUtils;
-import com.artillexstudios.axguiframework.GuiFrame;
-import com.artillexstudios.axguiframework.actions.GuiActions;
-import com.artillexstudios.axguiframework.libs.gui.guis.Gui;
-import com.artillexstudios.axguiframework.replacements.Replacements;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
+import com.artillexstudios.axplayerwarps.config.Config;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiFrame;
+import com.artillexstudios.axplayerwarps.guis.framework.Replacements;
+import com.artillexstudios.axplayerwarps.guis.framework.actions.GuiActions;
 import com.artillexstudios.axplayerwarps.input.InputManager;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
+import com.artillexstudios.axplayerwarps.utils.NumberUtils;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.warps.Warp;
+import dev.dejvokep.boostedyaml.block.implementation.Section;
+import dev.dejvokep.boostedyaml.settings.dumper.DumperSettings;
+import dev.dejvokep.boostedyaml.settings.general.GeneralSettings;
+import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
+import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
+import dev.triumphteam.gui.guis.Gui;
 import org.bukkit.entity.Player;
 
 import java.io.File;
@@ -76,7 +76,7 @@ public class RateWarpGui extends GuiFrame<Gui> {
                         AxPlayerWarps.getDatabase().addToFavorites(player, warp);
                         MESSAGEUTILS.sendLang(player, "favorite.add", Map.of("%warp%", warp.getName()));
                     }
-                    Scheduler.get().run(() -> open());
+                    Scheduler.run(player, this::open);
                 });
             }, slotOverrides);
         }
@@ -92,7 +92,7 @@ public class RateWarpGui extends GuiFrame<Gui> {
                 AxPlayerWarps.getThreadedQueue().submit(() -> {
                     AxPlayerWarps.getDatabase().removeRating(player, warp);
                     MESSAGEUTILS.sendLang(player, "rate.remove");
-                    Scheduler.get().run(() -> open());
+                    Scheduler.run(player, this::open);
                 });
             }
             if (event.isLeftClick()) {
@@ -106,7 +106,7 @@ public class RateWarpGui extends GuiFrame<Gui> {
                             MESSAGEUTILS.sendLang(player, "rate.add", Map.of("%rating%", "" + i));
                         });
                     }
-                    Scheduler.get().run(() -> open());
+                    Scheduler.run(player, this::open);
                 });
             }
         });

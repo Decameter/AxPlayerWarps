@@ -1,26 +1,27 @@
 package com.artillexstudios.axplayerwarps.user;
 
-import com.artillexstudios.axguiframework.GuiFrame;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.category.Category;
 import com.artillexstudios.axplayerwarps.category.CategoryManager;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiFrame;
 import com.artillexstudios.axplayerwarps.sorting.Sort;
 import com.artillexstudios.axplayerwarps.sorting.SortingManager;
 import com.artillexstudios.axplayerwarps.warps.Warp;
-import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class WarpUser {
     private final Player player;
     private int sortingIdx = 0;
     private int categoryIdx = -1;
-    private final CircularFifoQueue<GuiFrame<?>> lastGuis = new CircularFifoQueue<>(5);
+    private final Deque<GuiFrame<?>> lastGuis = new ConcurrentLinkedDeque<>();
     private List<Warp> favorites = Collections.synchronizedList(new ArrayList<>());
 
     public WarpUser(Player player) {
@@ -64,12 +65,14 @@ public class WarpUser {
         return CategoryManager.getCategories().values().stream().toList().get((a % b + b) % b);
     }
 
-    public CircularFifoQueue<GuiFrame<?>> getLastGuis() {
+    public Deque<GuiFrame<?>> getLastGuis() {
         return lastGuis;
     }
 
+    // keeps the last 5 guis for the back action
     public void addGui(GuiFrame<?> guiFrame) {
-        lastGuis.add(guiFrame);
+        lastGuis.addLast(guiFrame);
+        while (lastGuis.size() > 5) lastGuis.pollFirst();
     }
 
     public List<Warp> getFavorites() {

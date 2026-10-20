@@ -1,9 +1,8 @@
 package com.artillexstudios.axplayerwarps.utils;
 
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
+import com.artillexstudios.axplayerwarps.config.Config;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -43,17 +42,17 @@ public class UpdateNotifier implements Listener {
     }
 
     public UpdateNotifier() {
-        this.current = AxPlayerWarps.getInstance().getDescription().getVersion();
+        this.current = AxPlayerWarps.getInstance().getPluginMeta().getVersion();
 
         AxPlayerWarps.getInstance().getServer().getPluginManager().registerEvents(this, AxPlayerWarps.getInstance());
 
         long time = 30L * 60L * 20L;
-        Scheduler.get().runAsyncTimer(t -> {
+        Scheduler.runAsyncTimer(t -> {
             this.latest = readVersion();
             this.newest = !isOutdated(current);
 
             if (latest == null || newest) return;
-            Scheduler.get().runLaterAsync(t2 -> {
+            Scheduler.runLaterAsync(() -> {
                 Bukkit.getConsoleSender().sendMessage(getMessage());
             }, 50L);
             t.cancel();
@@ -65,16 +64,16 @@ public class UpdateNotifier implements Listener {
         if (latest == null || newest) return;
         if (!onJoin) return;
         if (!event.getPlayer().hasPermission(AxPlayerWarps.getInstance().getName().toLowerCase() + ".update-notify")) return;
-        Scheduler.get().runLaterAsync(t -> {
+        Scheduler.runLaterAsync(() -> {
             event.getPlayer().sendMessage(getMessage());
         }, 50L);
     }
 
-    private String getMessage() {
+    private Component getMessage() {
         HashMap<String, String> map = new HashMap<>();
         map.put("%current%", current);
         map.put("%latest%", latest);
-        return StringUtils.formatToString(String.format("%s %s", prefix, updateNotifier), map);
+        return StringUtils.format(String.format("%s %s", prefix, updateNotifier), map);
     }
 
     @Nullable

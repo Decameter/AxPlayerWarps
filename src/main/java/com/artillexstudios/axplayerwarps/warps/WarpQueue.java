@@ -1,7 +1,7 @@
 package com.artillexstudios.axplayerwarps.warps;
 
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.Cooldown;
+import com.artillexstudios.axplayerwarps.utils.Cooldown;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
 import org.bukkit.entity.Player;
 
 import java.util.Iterator;
@@ -14,10 +14,10 @@ import static com.artillexstudios.axplayerwarps.AxPlayerWarps.MESSAGEUTILS;
 
 public class WarpQueue {
     private static final Map<Player, TeleportData> queue = new ConcurrentHashMap<>();
-    private static final Cooldown<Player> cooldown = Cooldown.create();
+    private static final Cooldown<Player> cooldown = new Cooldown<>();
 
     public static void start() {
-        Scheduler.get().runTimer(() -> {
+        Scheduler.runTimer(() -> {
             long time = CONFIG.getLong("teleport-delay-seconds");
             try {
                 for (Iterator<Map.Entry<Player, TeleportData>> it = queue.entrySet().iterator(); it.hasNext(); ) {

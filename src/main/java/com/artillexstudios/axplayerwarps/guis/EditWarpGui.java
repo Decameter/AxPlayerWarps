@@ -1,37 +1,34 @@
 package com.artillexstudios.axplayerwarps.guis;
 
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.items.WrappedItemStack;
-import com.artillexstudios.axapi.items.components.DataComponents;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.loader.LoaderSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.updater.UpdaterSettings;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.ItemBuilder;
-import com.artillexstudios.axapi.utils.NumberUtils;
-import com.artillexstudios.axapi.utils.StringUtils;
-import com.artillexstudios.axguiframework.GuiFrame;
-import com.artillexstudios.axguiframework.actions.GuiActions;
-import com.artillexstudios.axguiframework.item.AxGuiItem;
-import com.artillexstudios.axguiframework.libs.gui.guis.Gui;
-import com.artillexstudios.axguiframework.replacements.Replacements;
-import com.artillexstudios.axintegrations.types.CurrencyIntegration;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.category.Category;
 import com.artillexstudios.axplayerwarps.category.CategoryManager;
+import com.artillexstudios.axplayerwarps.config.Config;
 import com.artillexstudios.axplayerwarps.enums.Access;
 import com.artillexstudios.axplayerwarps.enums.AccessList;
+import com.artillexstudios.axplayerwarps.guis.framework.AxGuiItem;
+import com.artillexstudios.axplayerwarps.guis.framework.GuiFrame;
+import com.artillexstudios.axplayerwarps.guis.framework.Replacements;
+import com.artillexstudios.axplayerwarps.guis.framework.actions.GuiActions;
+import com.artillexstudios.axplayerwarps.hooks.HookManager;
+import com.artillexstudios.axplayerwarps.hooks.currency.CurrencyHook;
 import com.artillexstudios.axplayerwarps.input.InputManager;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
+import com.artillexstudios.axplayerwarps.utils.ItemBuilder;
+import com.artillexstudios.axplayerwarps.utils.NumberUtils;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
 import com.artillexstudios.axplayerwarps.utils.WarpNameUtils;
 import com.artillexstudios.axplayerwarps.warps.Warp;
 import com.artillexstudios.axplayerwarps.warps.WarpManager;
+import dev.dejvokep.boostedyaml.settings.dumper.DumperSettings;
+import dev.dejvokep.boostedyaml.settings.general.GeneralSettings;
+import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
+import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
+import dev.triumphteam.gui.guis.Gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -128,14 +125,12 @@ public class EditWarpGui extends GuiFrame<Gui> {
                             AxPlayerWarps.getDatabase().updateWarp(warp);
                             MESSAGEUTILS.sendLang(player, "editor.update-name");
                     }
-                    Scheduler.get().run(() -> open());
+                    Scheduler.run(player, this::open);
                 });
             });
         });
 
-        ItemStack mt = guiItem.getItemStack();
-        if (warp.getIcon() != null) mt.setType(warp.getIcon());
-        guiItem.setItemStack(mt);
+        if (guiItem != null && warp.getIcon() != null) guiItem.setItemStack(guiItem.getItemStack().withType(warp.getIcon()));
 
         createItem("location", event -> {
             GuiActions.run(player, this, event, section.getStringList("location.actions"));
@@ -239,8 +234,9 @@ public class EditWarpGui extends GuiFrame<Gui> {
         createItem("price", event -> {
             GuiActions.run(player, this, event, section.getStringList("price.actions"));
             if (warp.getEarnedMoney() > 0) warp.withdrawMoney();
-            CurrencyIntegration currency = warp.getCurrencyIntegration();
-            List<CurrencyIntegration> currencies = CurrencyIntegration.list();
+            CurrencyHook currency = warp.getCurrencyHook();
+            List<CurrencyHook> currencies = HookManager.getCurrencies();
+            if (currencies.isEmpty()) return;
             int idx = currency == null ? -1 : currencies.indexOf(currency);
             if (event.isLeftClick()) {
                 if (event.isShiftClick()) {
@@ -282,7 +278,7 @@ public class EditWarpGui extends GuiFrame<Gui> {
             if (event.isShiftClick() && event.isRightClick()) {
                 GuiActions.run(player, this, event, section.getStringList("delete.actions"));
                 warp.delete();
-                Scheduler.get().runLaterAt(player.getLocation(), () -> {
+                Scheduler.runLaterAt(player.getLocation(), () -> {
                     player.closeInventory();
                 }, 1);
             }
@@ -294,19 +290,19 @@ public class EditWarpGui extends GuiFrame<Gui> {
             open();
         });
 
+        // the warp's description is added after the placeholders are parsed, so it is shown as written
         ItemBuilder builder = ItemBuilder.create(section.getSection("description"));
-        WrappedItemStack wrap = WrappedItemStack.wrap(builder.get());
+        builder.setName(parseText(section.getString("description.name", "")));
         List<String> lore = new ArrayList<>();
         String[] description = warp.getDescription().split("\n", CONFIG.getInt("warp-description.max-lines", 3));
-        for (Component line : wrap.get(DataComponents.LORE).lines()) {
-            String serialized = StringUtils.MINI_MESSAGE.serialize(line);
-            if (serialized.contains("%description%")) {
+        for (String line : parseText(section.getStringList("description.lore"))) {
+            if (line.contains("%description%")) {
                 for (String s : description) {
-                    lore.add(serialized.replace("%description%", s));
+                    lore.add(line.replace("%description%", s));
                 }
                 continue;
             }
-            lore.add(serialized);
+            lore.add(line);
         }
         builder.setLore(lore);
 
@@ -324,14 +320,14 @@ public class EditWarpGui extends GuiFrame<Gui> {
                     int maxLineLength = CONFIG.getInt("warp-description.max-line-length");
                     if (result.length() > CONFIG.getInt("warp-description.max-line-length")) {
                         MESSAGEUTILS.sendLang(player, "errors.max-length", Map.of("%length%", String.valueOf(maxLineLength)));
-                        Scheduler.get().run(() -> open());
+                        Scheduler.run(player, this::open);
                         return;
                     }
                     desc.add(result);
                     warp.setDescription(desc);
                     AxPlayerWarps.getThreadedQueue().submit(() -> {
                         AxPlayerWarps.getDatabase().updateWarp(warp);
-                        Scheduler.get().run(() -> open());
+                        Scheduler.run(player, this::open);
                     });
                 });
                 return;

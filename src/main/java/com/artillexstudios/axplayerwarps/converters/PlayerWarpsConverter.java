@@ -1,8 +1,8 @@
 package com.artillexstudios.axplayerwarps.converters;
 
-import com.artillexstudios.axapi.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.enums.Access;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
 import com.artillexstudios.axplayerwarps.warps.Warp;
 import com.artillexstudios.axplayerwarps.warps.WarpManager;
 import org.bukkit.Bukkit;
@@ -49,6 +49,6 @@ public class PlayerWarpsConverter implements Converter {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        Bukkit.getConsoleSender().sendMessage(StringUtils.formatToString("&#33FF33[AxPlayerWarps] Finished converting " + warps + " warps of " + players.size() + " players!"));
+        Bukkit.getConsoleSender().sendMessage(StringUtils.format("&#33FF33[AxPlayerWarps] Finished converting " + warps + " warps of " + players.size() + " players!"));
     }
 }

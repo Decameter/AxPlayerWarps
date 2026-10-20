@@ -1,6 +1,5 @@
 package com.artillexstudios.axplayerwarps.database;
 
-import com.artillexstudios.axapi.utils.Pair;
 import com.artillexstudios.axplayerwarps.category.Category;
 import com.artillexstudios.axplayerwarps.database.impl.Base;
 import com.artillexstudios.axplayerwarps.enums.AccessList;
@@ -15,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface Database {
@@ -40,7 +40,7 @@ public interface Database {
 
     UUID getUUIDFromId(int id);
 
-    Pair<UUID, String> getUUIDAndNameFromId(int id);
+    Map.Entry<UUID, String> getUUIDAndNameFromId(int id);
 
     String getWorldFromId(int id);
 
@@ -71,7 +71,7 @@ public interface Database {
     @Nullable
     Integer getRating(Player player, Warp warp);
 
-    Pair<Integer, Float> getRatings(Warp warp);
+    Map.Entry<Integer, Float> getRatings(Warp warp);
 
     HashMap<UUID, Integer> getAllRatings(Warp warp);
 

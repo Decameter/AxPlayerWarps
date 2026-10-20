@@ -1,152 +1,182 @@
 package com.artillexstudios.axplayerwarps.hooks;
 
-import com.artillexstudios.axapi.libs.boostedyaml.block.implementation.Section;
-import com.artillexstudios.axintegrations.IntegrationManager;
-import com.artillexstudios.axintegrations.IntegrationSetup;
-import com.artillexstudios.axintegrations.IntegrationType;
-import com.artillexstudios.axintegrations.api.AxIntegrationsAPI;
-import com.artillexstudios.axintegrations.types.CurrencyIntegration;
-import com.artillexstudios.axplayerwarps.hooks.currency.PlaceholderCurrencyIntegration;
+import com.artillexstudios.axplayerwarps.hooks.currency.CurrencyHook;
+import com.artillexstudios.axplayerwarps.hooks.currency.ExperienceHook;
+import com.artillexstudios.axplayerwarps.hooks.currency.PlaceholderCurrencyHook;
+import com.artillexstudios.axplayerwarps.hooks.currency.PlayerPointsHook;
+import com.artillexstudios.axplayerwarps.hooks.currency.TokenManagerHook;
+import com.artillexstudios.axplayerwarps.hooks.currency.VaultHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.BentoBoxHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.GriefPreventionHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.HuskClaimsHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.HuskTownsHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.LandsHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.PlotSquaredHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.ProtectionHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.SuperiorSkyblockHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.TownyHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.WorldGuardHook;
+import com.artillexstudios.axplayerwarps.utils.StringUtils;
+import dev.dejvokep.boostedyaml.block.implementation.Section;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Supplier;
 
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.CURRENCIES;
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.HOOKS;
 
+/**
+ * Currency and protection hooks. Each hook is only created when its plugin is enabled, and can be turned off in
+ * currencies.yml ("register: false") or hooks.yml ("hooks.protection.<plugin>: false").
+ */
 public class HookManager {
     private static final Map<String, CurrencyOptions> currencyOptions = new HashMap<>();
-    private static final List<CurrencyIntegration> placeholderCurrencyIntegrations = new ArrayList<>();
+    private static final List<CurrencyHook> currencies = new ArrayList<>();
+    private static final Map<String, ProtectionHook> protections = new LinkedHashMap<>();
 
     public record CurrencyOptions(String displayName) {}
 
+    /**
+     * Should run after every plugin is enabled, so economies registered with Vault are found.
+     */
     public static void setupHooks() {
-        IntegrationSetup.builder()
-                .enableCurrencyIntegrations(name -> {
-                    Section currencies = CURRENCIES.getSection("currencies");
-                    return currencies.getBoolean("%s.register".formatted(name), true);
-                }, name -> {
-                    Section currencies = CURRENCIES.getSection("currencies");
-                    List<Map<?, ?>> list = currencies.getMapList("%s.enabled".formatted(name));
-                    if (list.isEmpty()) { // this should never be called
-                        String displayName = currencies.getString("%s.name".formatted(name));
-                        currencyOptions.put(name, new CurrencyOptions(displayName));
-                        return Collections.singletonList("");
-                    }
-                    Set<String> set = new HashSet<>();
-                    for (Map<?, ?> map : list) {
-                        String currencyName = (String) map.get("currency-name");
-                        String displayName = (String) map.get("name");
-                        set.add(currencyName);
-                        currencyOptions.put("%s-%s".formatted(name, currencyName), new CurrencyOptions(displayName));
-                    }
-                    return new ArrayList<>(set);
-                })
-                .enableProtectionIntegrations(name -> {
-                    return HOOKS.getBoolean("hooks.protection.%s".formatted(name), true);
-                })
-                .runAfterLoad(() -> {
-                    {
-                        boolean modified = false;
-                        for (String name : IntegrationManager.listAvailableIntegrations(IntegrationType.PROTECTION).keySet()) {
-                            String route = "%s.%s".formatted("hooks.protection", name);
-                            if (HOOKS.getString(route) == null) {
-                                HOOKS.set(route, true);
-                                modified = true;
-                            }
-                        }
-                        if (modified) HOOKS.save();
-                    }
-                    {
-                        boolean modified = false;
-                        Map<String, Boolean> currencyIntegrations = new HashMap<>();
-                        for (String name : IntegrationManager.listAvailableIntegrations(IntegrationType.CURRENCY).values()) {
-                            String[] st = name.split("-");
-                            currencyIntegrations.put(st[0], st.length > 1);
-                        }
-                        for (Map.Entry<String, Boolean> entry : currencyIntegrations.entrySet()) {
-                            String plugin = entry.getKey();
-                            boolean multiCurrency = entry.getValue();
-                            String route = "currencies.%s".formatted(plugin);
-                            if (CURRENCIES.getSection(route) == null) {
-                                CURRENCIES.set("%s.register".formatted(route), true);
-                                if (!multiCurrency) {
-                                    CURRENCIES.set("%s.name".formatted(route), "%price% money");
-                                } else {
-                                    List<Map<String, String>> mapList = new ArrayList<>();
-                                    Map<String, String> map = new HashMap<>();
-                                    map.put("currency-name", "coins");
-                                    map.put("name", "%price% coins");
-                                    mapList.add(map);
-                                    CURRENCIES.set("%s.enabled".formatted(route), mapList);
-                                }
-                                modified = true;
-                            }
-                        }
-                        if (modified) CURRENCIES.save();
-                    }
+        Map<String, Supplier<CurrencyHook>> available = availableCurrencies();
+        boolean modified = false;
+        for (String name : available.keySet()) {
+            String route = "currencies." + name;
+            if (CURRENCIES.getSection(route) != null) continue;
+            CURRENCIES.set(route + ".register", true);
+            CURRENCIES.set(route + ".name", "%price% money");
+            modified = true;
+        }
+        if (modified) CURRENCIES.save();
 
-                    registerPlaceholderCurrencies();
-                })
-                .runAfterSetup(() -> {
-                    for (CurrencyIntegration integration : CurrencyIntegration.list()) {
-                        if (integration instanceof PlaceholderCurrencyIntegration) continue;
-                        String name = integration.getName();
-                        if (!integration.getFormattedName().equals(integration.getName())) continue;
-                        currencyOptions.put(name, new CurrencyOptions(CURRENCIES.getString("currencies.%s.name".formatted(name))));
-                    }
-                })
-                .setup();
+        modified = false;
+        for (String name : availableProtections().keySet()) {
+            String route = "hooks.protection." + name;
+            if (HOOKS.getString(route) != null) continue;
+            HOOKS.set(route, true);
+            modified = true;
+        }
+        if (modified) HOOKS.save();
+
+        updateHooks();
     }
 
     public static void updateHooks() {
+        currencies.clear();
         currencyOptions.clear();
-        IntegrationManager.reload(() -> {
-            for (CurrencyIntegration integration : placeholderCurrencyIntegrations) {
-                AxIntegrationsAPI.unregisterIntegration(integration);
-            }
-            registerPlaceholderCurrencies();
-        });
-        for (CurrencyIntegration integration : CurrencyIntegration.list()) {
-            if (integration instanceof PlaceholderCurrencyIntegration) continue;
-            String name = integration.getFormattedName();
-            if (!name.equals(integration.getName())) {
-                String[] plugin = name.split("-");
-                Section currencies = CURRENCIES.getSection("currencies");
-                List<Map<?, ?>> list = currencies.getMapList("%s.enabled".formatted(plugin[0]));
-                for (Map<?, ?> map : list) {
-                    String currencyName = (String) map.get("currency-name");
-                    if (!currencyName.equals(plugin[1])) continue;
-                    String displayName = (String) map.get("name");
-                    currencyOptions.put(name, new CurrencyOptions(displayName));
-                }
-                continue;
-            }
-            currencyOptions.put(name, new CurrencyOptions(CURRENCIES.getString("currencies.%s.name".formatted(name))));
-        }
-    }
+        protections.clear();
 
-    private static void registerPlaceholderCurrencies() {
+        for (Map.Entry<String, Supplier<CurrencyHook>> entry : availableCurrencies().entrySet()) {
+            String route = "currencies." + entry.getKey();
+            if (!CURRENCIES.getBoolean(route + ".register", true)) continue;
+            CurrencyHook hook = create(entry.getKey(), entry.getValue());
+            if (hook == null) continue;
+            currencies.add(hook);
+            currencyOptions.put(hook.getFormattedName(), new CurrencyOptions(CURRENCIES.getString(route + ".name", "%price%")));
+        }
+
         Section placeholderCurrencies = CURRENCIES.getSection("placeholder-currencies");
-        for (String route : placeholderCurrencies.getRoutesAsStrings(false)) {
-            Section section = placeholderCurrencies.getSection(route);
-            if (!section.getBoolean("register", false)) continue;
-            PlaceholderCurrencyIntegration integration = new PlaceholderCurrencyIntegration(route, section);
-            if (!integration.canLoad()) continue;
-            if (!integration.setup()) continue;
-            AxIntegrationsAPI.registerIntegration(integration);
-            placeholderCurrencyIntegrations.add(integration);
-            String val = section.getString("name", "%price% money");
-            currencyOptions.put(route, new CurrencyOptions(val));
+        if (placeholderCurrencies != null && Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            for (String route : placeholderCurrencies.getRoutesAsStrings(false)) {
+                Section section = placeholderCurrencies.getSection(route);
+                if (section == null || !section.getBoolean("register", false)) continue;
+                currencies.add(new PlaceholderCurrencyHook(route, section));
+                currencyOptions.put(route, new CurrencyOptions(section.getString("name", "%price% money")));
+            }
+        }
+
+        for (Map.Entry<String, Supplier<ProtectionHook>> entry : availableProtections().entrySet()) {
+            if (!HOOKS.getBoolean("hooks.protection." + entry.getKey(), true)) continue;
+            ProtectionHook hook = create(entry.getKey(), entry.getValue());
+            if (hook != null) protections.put(entry.getKey(), hook);
+        }
+
+        List<String> names = new ArrayList<>();
+        for (CurrencyHook hook : currencies) names.add(hook.getFormattedName());
+        names.addAll(protections.keySet());
+        if (!names.isEmpty()) {
+            Bukkit.getConsoleSender().sendMessage(StringUtils.format("&#33EEBB[AxPlayerWarps] Hooked into &f" + String.join(", ", names) + "&#33EEBB!"));
         }
     }
 
-    public static CurrencyOptions getCurrencyOptions(CurrencyIntegration integration) {
-        return currencyOptions.get(integration.getFormattedName());
+    // the suppliers keep the hook classes from loading unless their plugin is installed
+    private static Map<String, Supplier<CurrencyHook>> availableCurrencies() {
+        Map<String, Supplier<CurrencyHook>> map = new LinkedHashMap<>();
+        map.put("Experience", () -> new ExperienceHook(false));
+        map.put("Level", () -> new ExperienceHook(true));
+        if (enabled("Vault")) map.put("Vault", VaultHook::create);
+        if (enabled("PlayerPoints")) map.put("PlayerPoints", PlayerPointsHook::new);
+        if (enabled("TokenManager")) map.put("TokenManager", TokenManagerHook::new);
+        return map;
+    }
+
+    private static Map<String, Supplier<ProtectionHook>> availableProtections() {
+        Map<String, Supplier<ProtectionHook>> map = new LinkedHashMap<>();
+        if (enabled("WorldGuard")) map.put("WorldGuard", WorldGuardHook::new);
+        if (enabled("GriefPrevention")) map.put("GriefPrevention", GriefPreventionHook::new);
+        if (enabled("Lands")) map.put("Lands", LandsHook::new);
+        if (enabled("Towny")) map.put("Towny", TownyHook::new);
+        if (enabled("PlotSquared")) map.put("PlotSquared", PlotSquaredHook::new);
+        if (enabled("HuskClaims")) map.put("HuskClaims", HuskClaimsHook::new);
+        if (enabled("HuskTowns")) map.put("HuskTowns", HuskTownsHook::new);
+        if (enabled("SuperiorSkyblock2")) map.put("SuperiorSkyblock2", SuperiorSkyblockHook::new);
+        if (enabled("BentoBox")) map.put("BentoBox", BentoBoxHook::new);
+        return map;
+    }
+
+    private static boolean enabled(String plugin) {
+        return Bukkit.getPluginManager().isPluginEnabled(plugin);
+    }
+
+    @Nullable
+    private static <T> T create(String name, Supplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (Throwable throwable) {
+            // usually an incompatible version of the plugin
+            Bukkit.getConsoleSender().sendMessage(StringUtils.format("&#FF0000[AxPlayerWarps] Failed to hook into " + name + ": " + throwable));
+            return null;
+        }
+    }
+
+    public static List<CurrencyHook> getCurrencies() {
+        return currencies;
+    }
+
+    /**
+     * Finds a currency by its plugin name or by its formatted name.
+     */
+    @Nullable
+    public static CurrencyHook getCurrency(@Nullable String name) {
+        if (name == null) return null;
+        for (CurrencyHook hook : currencies) {
+            if (hook.getFormattedName().equalsIgnoreCase(name)) return hook;
+        }
+        for (CurrencyHook hook : currencies) {
+            if (hook.getName().equalsIgnoreCase(name)) return hook;
+        }
+        return null;
+    }
+
+    public static CurrencyOptions getCurrencyOptions(CurrencyHook hook) {
+        return currencyOptions.get(hook.getFormattedName());
+    }
+
+    public static boolean canBreak(@NotNull Player player, @NotNull Location location) {
+        for (ProtectionHook hook : protections.values()) {
+            if (!hook.canBreak(player, location)) return false;
+        }
+        return true;
     }
 }

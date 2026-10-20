@@ -1,27 +1,26 @@
 package com.artillexstudios.axplayerwarps.guis;
 
-import com.artillexstudios.axapi.config.Config;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.loader.LoaderSettings;
-import com.artillexstudios.axapi.libs.boostedyaml.settings.updater.UpdaterSettings;
-import com.artillexstudios.axapi.nms.wrapper.ServerPlayerWrapper;
-import com.artillexstudios.axapi.placeholders.PlaceholderHandler;
-import com.artillexstudios.axapi.scheduler.Scheduler;
-import com.artillexstudios.axapi.utils.ItemBuilder;
-import com.artillexstudios.axguiframework.PaginatedGuiFrame;
-import com.artillexstudios.axguiframework.actions.GuiActions;
-import com.artillexstudios.axguiframework.item.AxGuiItem;
-import com.artillexstudios.axguiframework.libs.gui.guis.Gui;
-import com.artillexstudios.axguiframework.libs.gui.guis.PaginatedGui;
-import com.artillexstudios.axguiframework.replacements.Replacements;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
+import com.artillexstudios.axplayerwarps.config.Config;
 import com.artillexstudios.axplayerwarps.database.impl.Base;
 import com.artillexstudios.axplayerwarps.enums.AccessList;
+import com.artillexstudios.axplayerwarps.guis.framework.AxGuiItem;
+import com.artillexstudios.axplayerwarps.guis.framework.PaginatedGuiFrame;
+import com.artillexstudios.axplayerwarps.guis.framework.Replacements;
+import com.artillexstudios.axplayerwarps.guis.framework.actions.GuiActions;
 import com.artillexstudios.axplayerwarps.input.InputManager;
+import com.artillexstudios.axplayerwarps.placeholders.PlaceholderHandler;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
+import com.artillexstudios.axplayerwarps.utils.ItemBuilder;
+import com.artillexstudios.axplayerwarps.utils.Scheduler;
 import com.artillexstudios.axplayerwarps.warps.Warp;
+import dev.dejvokep.boostedyaml.settings.dumper.DumperSettings;
+import dev.dejvokep.boostedyaml.settings.general.GeneralSettings;
+import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
+import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
+import dev.triumphteam.gui.guis.Gui;
+import dev.triumphteam.gui.guis.PaginatedGui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -102,7 +101,7 @@ public class BlacklistGui extends PaginatedGuiFrame {
                         AxPlayerWarps.getDatabase().addToList(warp, accessList, Bukkit.getOfflinePlayer(uuid));
                         MESSAGEUTILS.sendLang(player, accessList.name().toLowerCase() + ".add", Map.of("%player%", result));
                     }
-                    Scheduler.get().run(() -> open());
+                    Scheduler.run(player, this::open);
                 });
             });
         });
@@ -128,9 +127,8 @@ public class BlacklistGui extends PaginatedGuiFrame {
                 if (builder.get().getType() == Material.PLAYER_HEAD) {
                     Player pl = Bukkit.getPlayer(warp.getOwner());
                     if (pl != null) {
-                        ServerPlayerWrapper wrapper = ServerPlayerWrapper.wrap(pl);
-                        var textures = wrapper.textures();
-                        if (textures.texture() != null) builder.setTextureValue(textures.texture());
+                        String texture = ItemBuilder.getTexture(pl);
+                        if (texture != null) builder.setTextureValue(texture);
                     }
                 }
 
@@ -150,9 +148,9 @@ public class BlacklistGui extends PaginatedGuiFrame {
                 }));
             }
 
-            Scheduler.get().run(player, task -> {
+            Scheduler.run(player, () -> {
                 future.complete(null);
-            }, () -> {});
+            });
         });
 
         return future;

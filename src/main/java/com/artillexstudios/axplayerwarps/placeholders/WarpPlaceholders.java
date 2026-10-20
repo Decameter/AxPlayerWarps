@@ -1,17 +1,10 @@
 package com.artillexstudios.axplayerwarps.placeholders;
 
-import com.artillexstudios.axapi.placeholders.PlaceholderArgument;
-import com.artillexstudios.axapi.placeholders.PlaceholderArguments;
-import com.artillexstudios.axapi.placeholders.PlaceholderContext;
-import com.artillexstudios.axapi.placeholders.PlaceholderHandler;
-import com.artillexstudios.axapi.placeholders.exception.PlaceholderException;
-import com.artillexstudios.axapi.utils.functions.ThrowingFunction;
-import com.artillexstudios.axintegrations.types.CurrencyIntegration;
 import com.artillexstudios.axplayerwarps.AxPlayerWarps;
 import com.artillexstudios.axplayerwarps.database.impl.Base;
 import com.artillexstudios.axplayerwarps.enums.AccessList;
 import com.artillexstudios.axplayerwarps.hooks.HookManager;
-import com.artillexstudios.axplayerwarps.placeholders.resolvers.WarpResolver;
+import com.artillexstudios.axplayerwarps.hooks.currency.CurrencyHook;
 import com.artillexstudios.axplayerwarps.user.Users;
 import com.artillexstudios.axplayerwarps.user.WarpUser;
 import com.artillexstudios.axplayerwarps.utils.FormatUtils;
@@ -25,12 +18,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.text.DecimalFormat;
 import java.util.Optional;
+import java.util.function.Function;
 
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.CONFIG;
 import static com.artillexstudios.axplayerwarps.AxPlayerWarps.LANG;
 
 public class WarpPlaceholders {
-    private static final PlaceholderArgument<Warp> warpArg = new PlaceholderArgument<>("warp", WarpResolver.class);
     public static final DecimalFormat df = new DecimalFormat("#.##");
     private static String noCategory;
 
@@ -48,7 +41,7 @@ public class WarpPlaceholders {
         String empty = "";
 
         // global
-        ThrowingFunction<PlaceholderContext, String, PlaceholderException> totalHandler = handler -> {
+        Function<PlaceholderHandler.Context, String> totalHandler = handler -> {
             return String.valueOf(WarpManager.getWarps().size());
         };
         PlaceholderHandler.register("total_warps", totalHandler, true);
@@ -56,14 +49,14 @@ public class WarpPlaceholders {
 
         // player
         PlaceholderHandler.register("player_warp_limit", handler -> {
-            Player player = handler.resolve(Player.class);
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             WarpUser user = Users.get(player);
             return String.valueOf(user.getWarpLimit());
         }, true);
 
-        ThrowingFunction<PlaceholderContext, String, PlaceholderException> playerWarpsHandler =handler -> {
-            Player player = handler.resolve(Player.class);
+        Function<PlaceholderHandler.Context, String> playerWarpsHandler =handler -> {
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             return String.valueOf(WarpManager.getWarps(player).size());
         };
@@ -71,14 +64,14 @@ public class WarpPlaceholders {
         PlaceholderHandler.register("my_warps", playerWarpsHandler, true);
 
         PlaceholderHandler.register("favorite_warps", handler -> {
-            Player player = handler.resolve(Player.class);
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             WarpUser user = Users.get(player);
             return String.valueOf(user.getFavorites().size());
         }, true);
 
         PlaceholderHandler.register("sorting_selected", handler -> {
-            Player player = handler.resolve(Player.class);
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             WarpUser user = Users.get(player);
             return user.getSorting().name();
@@ -87,13 +80,13 @@ public class WarpPlaceholders {
 
         // access player
         PlaceholderHandler.register("player", handler -> {
-            Base.AccessPlayer accessPlayer = handler.raw(Base.AccessPlayer.class);
+            Base.AccessPlayer accessPlayer = handler.get(Base.AccessPlayer.class);
             if (accessPlayer == null) return empty;
             return accessPlayer.name();
         }, false);
 
         PlaceholderHandler.register("added-date", handler -> {
-            Base.AccessPlayer accessPlayer = handler.raw(Base.AccessPlayer.class);
+            Base.AccessPlayer accessPlayer = handler.get(Base.AccessPlayer.class);
             if (accessPlayer == null) return empty;
             return TimeUtils.formatDate(accessPlayer.added());
         }, false);
@@ -183,7 +176,7 @@ public class WarpPlaceholders {
         registerWarp("price-full", handler -> {
             Warp warp = getWarp(handler);
             if (warp == null) return empty;
-            CurrencyIntegration integration = warp.getCurrencyIntegration();
+            CurrencyHook integration = warp.getCurrencyHook();
             if (integration == null) return "0";
             return FormatUtils.formatCurrency(integration, warp.getTeleportPrice());
         });
@@ -197,7 +190,7 @@ public class WarpPlaceholders {
         registerWarp("earned_money", handler -> {
             Warp warp = getWarp(handler);
             if (warp == null) return empty;
-            CurrencyIntegration integration = warp.getCurrencyIntegration();
+            CurrencyHook integration = warp.getCurrencyHook();
             if (integration == null) return "0";
             double earned = warp.getEarnedMoney();
             return FormatUtils.formatCurrency(integration, earned);
@@ -261,7 +254,7 @@ public class WarpPlaceholders {
         });
 
         registerWarp("given_rating_decimal", handler -> {
-            Player player = handler.resolve(Player.class);
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             Warp warp = getWarp(handler);
             if (warp == null) return empty;
@@ -270,7 +263,7 @@ public class WarpPlaceholders {
         });
 
         registerWarp("given_rating_stars", handler -> {
-            Player player = handler.resolve(Player.class);
+            Player player = handler.get(Player.class);
             if (player == null) return empty;
             Warp warp = getWarp(handler);
             if (warp == null) return empty;
@@ -280,16 +273,12 @@ public class WarpPlaceholders {
     }
 
     @Nullable
-    private static Warp getWarp(PlaceholderContext handler) throws PlaceholderException {
-        Warp warp = handler.raw(Warp.class);
-        if (warp == null) {
-            warp = handler.argument("warp");
-        }
-        return warp;
+    private static Warp getWarp(PlaceholderHandler.Context handler) {
+        return handler.get(Warp.class);
     }
 
-    private static void registerWarp(String placeholder, ThrowingFunction<PlaceholderContext, String, PlaceholderException> parser) {
+    private static void registerWarp(String placeholder, Function<PlaceholderHandler.Context, String> parser) {
         PlaceholderHandler.register(placeholder, parser, false);
-        PlaceholderHandler.register("<warp>_" + placeholder, new PlaceholderArguments(warpArg), parser, true);
+        PlaceholderHandler.registerWarpArgument(placeholder, parser);
     }
 }
