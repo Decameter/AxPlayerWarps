@@ -134,6 +134,10 @@ public class EditWarpGui extends GuiFrame<Gui> {
 
         createItem("location", event -> {
             GuiActions.run(player, this, event, section.getStringList("location.actions"));
+            if (!HookManager.canBreak(player, player.getLocation())) {
+                MESSAGEUTILS.sendLang(player, "errors.cannot-create-here");
+                return;
+            }
             warp.setLocation(player.getLocation());
             AxPlayerWarps.getThreadedQueue().submit(() -> {
                 AxPlayerWarps.getDatabase().updateWarp(warp);

@@ -10,6 +10,7 @@ import com.artillexstudios.axplayerwarps.hooks.protection.BentoBoxHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.GriefPreventionHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.HuskClaimsHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.HuskTownsHook;
+import com.artillexstudios.axplayerwarps.hooks.protection.IslandsHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.LandsHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.PlotSquaredHook;
 import com.artillexstudios.axplayerwarps.hooks.protection.ProtectionHook;
@@ -132,6 +133,7 @@ public class HookManager {
         if (enabled("HuskTowns")) map.put("HuskTowns", HuskTownsHook::new);
         if (enabled("SuperiorSkyblock2")) map.put("SuperiorSkyblock2", SuperiorSkyblockHook::new);
         if (enabled("BentoBox")) map.put("BentoBox", BentoBoxHook::new);
+        if (enabled("Islands")) map.put("Islands", IslandsHook::new);
         return map;
     }
 
